@@ -299,10 +299,12 @@ fn render_sessions_tab(frame: &mut Frame, app: &mut App, area: Rect) {
     }
 
     if app.sessions_tab.is_empty() {
-        let line = Line::from(Span::styled(
-            "  No saved reviews for this checkout",
-            Style::default().fg(theme.fg_dim),
-        ));
+        let hint = if app.sessions_tab.show_empty() {
+            "  No saved reviews for this checkout"
+        } else {
+            "  No saved reviews for this checkout — press a to show empty ones"
+        };
+        let line = Line::from(Span::styled(hint, Style::default().fg(theme.fg_dim)));
         frame.render_widget(
             Paragraph::new(vec![line]).style(styles::panel_style(theme)),
             area,
@@ -552,7 +554,14 @@ fn render_target_selector_footer(frame: &mut Frame, app: &App, area: Rect) {
                 };
                 format!("   j/k navigate · ↵ open · {scope_hint} · / filter · esc back")
             }
-            TargetTab::Sessions => "   j/k navigate · ↵ resume · esc back".to_string(),
+            TargetTab::Sessions => {
+                let empty_hint = if app.sessions_tab.show_empty() {
+                    "a hide empty"
+                } else {
+                    "a show empty"
+                };
+                format!("   j/k navigate · ↵ resume · dd delete · {empty_hint} · esc back")
+            }
         }
     };
     let hints_span = Span::styled(hints, Style::default().fg(theme.fg_secondary));
@@ -1204,6 +1213,38 @@ mod selector_render_snapshot_tests {
         assert!(rendered.contains("Messages"), "got:\n{rendered}");
         assert!(
             rendered.contains("forge API failure detail"),
+            "got:\n{rendered}"
+        );
+    }
+
+    #[test]
+    fn should_draw_confirm_prompt_only_while_keys_route_to_it() {
+        let render_full = |app: &mut App| {
+            let backend = TestBackend::new(120, 24);
+            let mut terminal = Terminal::new(backend).unwrap();
+            terminal
+                .draw(|frame| crate::ui::app_layout::render(frame, app))
+                .expect("draw frame");
+            let buffer = terminal.backend().buffer().clone();
+            (0..buffer.area.height)
+                .map(|y| row_text(&buffer, y))
+                .collect::<Vec<_>>()
+                .join("\n")
+        };
+        let mut app = make_app(vec![commit(0)]);
+        app.enter_confirm_mode(crate::app::ConfirmAction::DeleteSession);
+        let rendered = render_full(&mut app);
+        assert!(
+            rendered.contains("Delete this saved review?"),
+            "got:\n{rendered}"
+        );
+
+        // A prompt left behind after the mode moved on cannot be answered,
+        // so it must not be drawn.
+        app.input_mode = InputMode::Normal;
+        let rendered = render_full(&mut app);
+        assert!(
+            !rendered.contains("Delete this saved review?"),
             "got:\n{rendered}"
         );
     }
