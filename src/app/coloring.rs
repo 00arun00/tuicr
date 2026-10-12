@@ -67,6 +67,9 @@ impl AnnotatedLine {
             | Self::SideBySideLine {
                 file_idx, hunk_idx, ..
             }
+            | Self::ReviewedRange {
+                file_idx, hunk_idx, ..
+            }
             | Self::HunkHeader { file_idx, hunk_idx } => Some((*file_idx, *hunk_idx)),
             // Exhaustive list to force new variants to be considered.
             Self::PrInfoLine { .. }

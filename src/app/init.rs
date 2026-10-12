@@ -601,6 +601,7 @@ impl App {
             expanded_bottom: HashMap::new(),
             file_line_count_cache: HashMap::new(),
             line_annotations: Vec::new(),
+            range_fold_rows: HashMap::new(),
             colored_hunks: HashSet::new(),
             output_to_stdout,
             pending_stdout_output: None,

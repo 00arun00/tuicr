@@ -41,6 +41,13 @@ pub(crate) fn annotation_row_height(app: &App, idx: usize) -> usize {
     };
 
     match annotation {
+        AnnotatedLine::ReviewedRange { count, .. } => formatted_line_height(
+            Line::raw(format!(
+                "       {}",
+                crate::app::range_review::range_label(*count)
+            )),
+            viewport_width,
+        ),
         AnnotatedLine::RemoteReviewSummaryLine { summary_idx } => app
             .forge_review_summaries
             .get(*summary_idx)
@@ -213,6 +220,10 @@ fn full_row_text(app: &App, idx: usize, annotation: &AnnotatedLine) -> String {
     let indicator_spaced = diff_view::cursor_indicator_spaced(idx, app.diff_state.cursor_line);
 
     match annotation {
+        AnnotatedLine::ReviewedRange { count, .. } => format!(
+            "{indicator}      {}",
+            crate::app::range_review::range_label(*count)
+        ),
         AnnotatedLine::ReviewCommentsHeader => {
             format!(
                 "{indicator_spaced}{}{}",

@@ -384,7 +384,10 @@ impl App {
 
     fn hunk_at_cursor(&self) -> Option<(usize, usize)> {
         match self.line_annotations.get(self.diff_state.cursor_line)? {
-            AnnotatedLine::HunkHeader { file_idx, hunk_idx }
+            AnnotatedLine::ReviewedRange {
+                file_idx, hunk_idx, ..
+            }
+            | AnnotatedLine::HunkHeader { file_idx, hunk_idx }
             | AnnotatedLine::DiffLine {
                 file_idx, hunk_idx, ..
             }

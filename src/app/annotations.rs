@@ -390,6 +390,7 @@ impl App {
             self.line_annotations.push(AnnotatedLine::Spacing);
         }
 
+        self.project_reviewed_ranges();
         self.refresh_search_matches();
     }
 

@@ -599,7 +599,7 @@ pub fn render_help(frame: &mut Frame, app: &mut App) {
                 "  v/V       ",
                 Style::default().add_modifier(Modifier::BOLD),
             ),
-            Span::raw("Enter visual mode for range comments"),
+            Span::raw("Enter visual mode for range comments or review folding"),
         ]),
         Line::from(""),
         Line::from(Span::styled(
@@ -621,6 +621,9 @@ pub fn render_help(frame: &mut Frame, app: &mut App) {
             ),
             Span::raw("Create comment for selected range"),
         ]),
+        Line::from("  R         Mark selected lines reviewed and collapse"),
+        Line::from("  u         Remove partial review marks from selected lines"),
+        Line::from("  Enter (normal) Expand/collapse a reviewed range; keeps its marks"),
         Line::from(vec![
             Span::styled(
                 "  Esc/v/V   ",

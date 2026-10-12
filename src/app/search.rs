@@ -121,6 +121,7 @@ impl App {
                 return false;
             }
         };
+        self.expand_reviewed_ranges();
         self.diff_search_pattern = Some(compiled);
         self.last_search_pattern = Some(pattern);
         self.recompute_search_matches();
@@ -392,6 +393,9 @@ impl App {
                 Some(Cow::Owned(format!(
                     "... {arrow} expand ({count} lines) ..."
                 )))
+            }
+            AnnotatedLine::ReviewedRange { count, .. } => {
+                Some(Cow::Owned(super::range_review::range_label(*count)))
             }
             AnnotatedLine::HiddenLines { count, .. } => {
                 Some(Cow::Owned(format!("... {count} lines hidden ...")))
