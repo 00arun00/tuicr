@@ -81,6 +81,7 @@ impl App {
             return;
         };
         let ranges = review.reviewed_ranges.entry(key.clone()).or_default();
+        let mut folded_range_idx = None;
         if remove {
             // Subtract only selected source lines; preserve the rest of each mark.
             for range in ranges.iter_mut() {
@@ -99,6 +100,7 @@ impl App {
                     true
                 }
             });
+            folded_range_idx = Some(ranges.len());
             ranges.push(ReviewedRange {
                 lines: selected,
                 collapsed: true,
@@ -107,8 +109,17 @@ impl App {
         self.exit_visual_mode();
         self.dirty = true;
         self.rebuild_annotations();
-        self.diff_state.cursor_line = start
-            .annotation_idx
+        // Merging an overlapping mark can move the fold before the original
+        // selection. Anchor to its identity, never the now-stale screen row.
+        let folded_row = folded_range_idx.and_then(|range_idx| {
+            self.line_annotations.iter().position(|a| {
+                matches!(a,
+                AnnotatedLine::ReviewedRange { file_idx: f, hunk_idx: h, range_idx: r, .. }
+                if *f == file_idx && *h == hunk_idx && *r == range_idx)
+            })
+        });
+        self.diff_state.cursor_line = folded_row
+            .unwrap_or(start.annotation_idx)
             .min(self.line_annotations.len().saturating_sub(1));
         self.ensure_cursor_visible();
         self.set_message(if remove {
@@ -528,6 +539,18 @@ mod tests {
         let ranges = &app.session.files[&PathBuf::from("range.rs")].reviewed_ranges[&key];
         assert_eq!(ranges.len(), 1);
         assert_eq!(ranges[0].lines.len(), 10);
+        assert!(matches!(
+            app.line_annotations[app.diff_state.cursor_line],
+            AnnotatedLine::ReviewedRange { file_idx: 0, .. }
+        ));
+        assert!(app.toggle_range_at_cursor());
+        assert!(matches!(
+            app.line_annotations[app.diff_state.cursor_line],
+            AnnotatedLine::DiffLine {
+                new_lineno: Some(3),
+                ..
+            }
+        ));
         app.session
             .clear_comments(crate::model::ClearScope::CommentsAndReviewed);
         app.rebuild_annotations();
