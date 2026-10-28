@@ -185,7 +185,31 @@ from the checkout, never copied.
 |-----|--------|
 | `j` / `k` | Extend selection down / up |
 | `c` / `Enter` | Create comment for selected range |
+| `R` | Mark selected lines reviewed and collapse |
+| `u` | Remove reviewed-range marks from selected lines |
 | `Esc` / `v` / `V` | Cancel selection |
+
+### Review and fold a selected range
+
+In visual mode, `R` marks the selected **whole diff lines** reviewed and collapses
+those code rows into a `Reviewed section` row. Select within one hunk; selections
+across files, hunk boundaries, or existing folds are rejected. In side-by-side
+view, a selection reviews both sides of the selected rows. Normal-mode `r` and
+`R` keep their file and whole-hunk behavior, including on a folded section.
+
+Press `Enter` on the fold to expand it without clearing its review marks. Press
+`Enter` on code inside the expanded range to collapse it again. To remove partial
+review marks, expand, select the lines, and press `u` in visual mode. Overlapping
+selections merge; there are no nested folds. Partial marks do not mark the file
+or hunk complete automatically.
+
+Comments and remote discussions remain visible when their code is folded. Diff
+search and source-line jumps expand range folds so their targets remain reachable.
+Marks and fold state are saved with the review session (`:w` / `ZZ`), and survive
+reopening an unchanged hunk. Changed hunk content invalidates its partial marks.
+Switching layouts preserves the marked source lines. A side-by-side row with an
+unreviewed side stays visible; a selection containing both sides can fold it.
+`clearc` preserves marks; `:clear` removes them along with other review state.
 
 ## Comment mode
 

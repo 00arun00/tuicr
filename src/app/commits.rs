@@ -391,7 +391,10 @@ impl App {
 
     /// Whether a listed session holds review progress worth resuming.
     pub(in crate::app) fn is_resumable(summary: &crate::review_store::SessionSummary) -> bool {
-        summary.comment_count > 0 || summary.reviewed_count > 0
+        summary.comment_count > 0
+            || summary.reviewed_count > 0
+            || crate::persistence::storage::load_session(summary.session_ref.path())
+                .is_ok_and(|session| session.has_reviewed_state())
     }
 
     /// `owner/repo` for a checkout, falling back to the directory name when it

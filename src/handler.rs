@@ -1485,6 +1485,8 @@ pub fn handle_commit_selector_action(app: &mut App, action: Action) {
 /// Handle actions in VisualSelect mode
 pub fn handle_visual_action(app: &mut App, action: Action) {
     match action {
+        Action::ReviewSelectedRange => app.review_selected_range(false),
+        Action::UnreviewSelectedRange => app.review_selected_range(true),
         Action::CursorDown(n) => {
             app.cursor_down(n);
             app.extend_visual_to_cursor();
@@ -1681,6 +1683,9 @@ pub fn handle_diff_action(app: &mut App, action: Action) {
         Action::MouseScrollDown(n) => app.scroll_view_down(n),
         Action::MouseScrollUp(n) => app.scroll_view_up(n),
         Action::SelectFile => {
+            if app.toggle_range_at_cursor() {
+                return;
+            }
             if let Some(hit) = app.get_gap_at_cursor() {
                 match hit {
                     GapCursorHit::Expander(gap_id, dir) => {

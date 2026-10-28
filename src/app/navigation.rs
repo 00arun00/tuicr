@@ -459,6 +459,7 @@ impl App {
     }
 
     pub fn go_to_source_line(&mut self, target_lineno: u32, side: LineSide) {
+        self.expand_reviewed_ranges();
         let current_file = self.diff_state.current_file_idx;
         let mut result = self.find_source_line_in_diff(target_lineno, side);
         let side_label = match side {
@@ -1402,7 +1403,12 @@ impl App {
             }
         }
 
-        comment_lines + content_lines + spacing_lines
+        (comment_lines + content_lines + spacing_lines).saturating_sub(
+            self.range_fold_rows
+                .iter()
+                .filter(|((f, _, _), row)| *f == file_idx && row.is_none())
+                .count(),
+        )
     }
 
     /// Render-aware file height that knows about `is_single_file_view`.

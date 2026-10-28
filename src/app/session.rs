@@ -709,6 +709,12 @@ impl App {
             FileReview {
                 reviewed: unchanged_file && previous_review.reviewed,
                 reviewed_hunks,
+                reviewed_ranges: previous_review
+                    .reviewed_ranges
+                    .iter()
+                    .filter(|(key, _)| valid_hunks.contains(*key))
+                    .map(|(key, ranges)| (key.clone(), ranges.clone()))
+                    .collect(),
                 file_comments,
                 line_comments,
                 ..review

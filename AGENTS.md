@@ -475,3 +475,16 @@ You can reference comments by number (e.g., "Regarding comment #2...").
 4. **Preserve reviewer intent** - don't over-engineer solutions
 5. **Be concise** in your response
 6. **If unclear**, ask for clarification rather than guessing
+
+### Partial range reviews
+
+`app/range_review.rs` stores source diff-line index sets under the existing exact
+hunk review keys (`FileReview.reviewed_ranges`, serde-defaulted for old sessions).
+Visual `R` reviews whole selected rows (both sides in SBS), visual `u` subtracts
+marks, and normal Enter toggles visibility. Normal `r`/`R` retain their meaning.
+`project_reviewed_ranges` runs after annotation construction and builds the same
+code-row projection used by both renderers. It leaves comment rows untouched.
+File-height accounting subtracts only hidden code rows. Search and source-line
+jumps expand partial folds. Full diff reconciliation prunes missing hunk keys;
+strict subset views preserve them, matching whole-hunk marks. Partial marks count
+as persisted review state for session retention, but not as completed files.

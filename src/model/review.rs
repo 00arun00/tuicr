@@ -30,6 +30,13 @@ pub(crate) enum CommentLocation {
     },
 }
 
+/// Diff-line indices scoped to an exact hunk review key, never screen rows.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ReviewedRange {
+    pub lines: BTreeSet<usize>,
+    pub collapsed: bool,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct FileReview {
     pub path: PathBuf,
@@ -39,6 +46,8 @@ pub struct FileReview {
     pub line_comments: HashMap<u32, Vec<Comment>>,
     #[serde(default)]
     pub reviewed_hunks: BTreeSet<String>,
+    #[serde(default)]
+    pub reviewed_ranges: HashMap<String, Vec<ReviewedRange>>,
     #[serde(default)]
     pub content_hash: Option<u64>,
 }
@@ -52,6 +61,7 @@ impl FileReview {
             file_comments: Vec::new(),
             line_comments: HashMap::new(),
             reviewed_hunks: BTreeSet::new(),
+            reviewed_ranges: HashMap::new(),
             content_hash: Some(content_hash),
         }
     }
@@ -177,9 +187,9 @@ impl ReviewSession {
     }
 
     pub fn has_reviewed_state(&self) -> bool {
-        self.files
-            .values()
-            .any(|file| file.reviewed || !file.reviewed_hunks.is_empty())
+        self.files.values().any(|file| {
+            file.reviewed || !file.reviewed_hunks.is_empty() || !file.reviewed_ranges.is_empty()
+        })
     }
 
     /// Registers a file in the session. Returns true if the file was previously
@@ -206,6 +216,9 @@ impl ReviewSession {
             review
                 .reviewed_hunks
                 .retain(|key| valid_hunks.contains(key));
+            review
+                .reviewed_ranges
+                .retain(|key, _| valid_hunks.contains(key));
         }
         invalidated
     }
@@ -336,11 +349,15 @@ impl ReviewSession {
             file.file_comments.clear();
             file.line_comments.clear();
             if scope == ClearScope::CommentsAndReviewed {
-                if file.reviewed || !file.reviewed_hunks.is_empty() {
+                if file.reviewed
+                    || !file.reviewed_hunks.is_empty()
+                    || !file.reviewed_ranges.is_empty()
+                {
                     unreviewed += 1;
                 }
                 file.reviewed = false;
                 file.reviewed_hunks.clear();
+                file.reviewed_ranges.clear();
             }
         }
         (cleared, unreviewed)
@@ -916,6 +933,7 @@ mod tests {
 
         let review: FileReview = serde_json::from_str(json).unwrap();
         assert!(review.reviewed_hunks.is_empty());
+        assert!(review.reviewed_ranges.is_empty());
     }
 
     #[test]
@@ -1091,6 +1109,7 @@ mod tests {
                 file_comments: Vec::new(),
                 line_comments: HashMap::new(),
                 reviewed_hunks: BTreeSet::new(),
+                reviewed_ranges: HashMap::new(),
                 content_hash: None,
             },
         );

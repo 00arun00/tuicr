@@ -319,6 +319,12 @@ pub enum AnnotatedLine {
     ExpandedContext { gap_id: GapId, line_idx: usize },
     /// Hunk header (@@...@@)
     HunkHeader { file_idx: usize, hunk_idx: usize },
+    ReviewedRange {
+        file_idx: usize,
+        hunk_idx: usize,
+        range_idx: usize,
+        count: usize,
+    },
     /// Actual diff line with line numbers
     DiffLine {
         file_idx: usize,
@@ -481,6 +487,7 @@ pub fn annotation_file_idx(annotation: &AnnotatedLine) -> Option<usize> {
         AnnotatedLine::FileHeader { file_idx }
         | AnnotatedLine::ReviewedBanner { file_idx }
         | AnnotatedLine::FileComment { file_idx, .. }
+        | AnnotatedLine::ReviewedRange { file_idx, .. }
         | AnnotatedLine::HunkHeader { file_idx, .. }
         | AnnotatedLine::DiffLine { file_idx, .. }
         | AnnotatedLine::SideBySideLine { file_idx, .. }
@@ -1428,6 +1435,7 @@ pub struct App {
     pub file_line_count_cache: HashMap<usize, u32>,
     /// Cached annotations describing what each rendered line represents
     pub line_annotations: Vec<AnnotatedLine>,
+    pub(crate) range_fold_rows: HashMap<(usize, Option<u32>, Option<u32>), Option<String>>,
     /// Hunks `color_visible_hunks` already visited, as `(file_idx, hunk_idx)`
     /// so that they aren't re-colored.
     /// Cleared by `rebuild_annotations`, which runs whenever the diff is replaced.
@@ -1923,6 +1931,7 @@ mod init;
 mod modes;
 mod navigation;
 mod pr;
+pub(crate) mod range_review;
 mod reviewed;
 mod search;
 mod session;

@@ -38,6 +38,8 @@ pub enum Action {
     // Review actions
     ToggleReviewed,
     ToggleHunkReviewed,
+    ReviewSelectedRange,
+    UnreviewSelectedRange,
     AddLineComment,
     AddFileComment,
     EditComment,
@@ -637,6 +639,8 @@ fn map_visual_mode(key: KeyEvent) -> Action {
 
 fn map_visual_mode_with_q_quits(key: KeyEvent, q_quits: bool) -> Action {
     match (key.code, key.modifiers) {
+        (KeyCode::Char('R'), _) => Action::ReviewSelectedRange,
+        (KeyCode::Char('u'), KeyModifiers::NONE) => Action::UnreviewSelectedRange,
         // Extend selection
         (KeyCode::Char('j') | KeyCode::Down, KeyModifiers::NONE) => Action::CursorDown(1),
         (KeyCode::Char('k') | KeyCode::Up, KeyModifiers::NONE) => Action::CursorUp(1),
@@ -655,6 +659,25 @@ mod tests {
     use super::*;
     use crate::config::DEFAULT_LEADER_KEY;
     use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
+
+    #[test]
+    fn range_review_key_is_visual_only() {
+        for event in [key(KeyCode::Char('R')), key_shift('R')] {
+            assert_eq!(map_visual_mode(event), Action::ReviewSelectedRange);
+            assert_eq!(
+                map_normal_mode(event, DEFAULT_LEADER_KEY),
+                Action::ToggleHunkReviewed
+            );
+        }
+        assert_eq!(
+            map_visual_mode(key(KeyCode::Char('u'))),
+            Action::UnreviewSelectedRange
+        );
+        assert_eq!(
+            map_normal_mode(key(KeyCode::Char('r')), DEFAULT_LEADER_KEY),
+            Action::ToggleReviewed
+        );
+    }
 
     fn key(code: KeyCode) -> KeyEvent {
         KeyEvent::new(code, KeyModifiers::NONE)

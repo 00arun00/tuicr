@@ -1416,94 +1416,102 @@ fn render_context_line_side_by_side(
     mut line_idx: usize,
     lines: &mut Vec<Line>,
 ) -> (usize, Option<SideBySideCursorInfo>) {
-    if ctx.is_visible(line_idx) {
-        let w = ctx.lineno_width;
-        let old_line_num = ctx
-            .display_lineno(diff_line.old_lineno, line_idx)
-            .map(|n| format!("{n:>w$}"))
-            .unwrap_or_else(|| " ".repeat(w));
-        let new_line_num = ctx
-            .display_lineno(diff_line.new_lineno, line_idx)
-            .map(|n| format!("{n:>w$}"))
-            .unwrap_or_else(|| " ".repeat(w));
+    if !ctx.app.render_range_fold(
+        file_idx,
+        diff_line.old_lineno,
+        diff_line.new_lineno,
+        lines,
+        &mut line_idx,
+    ) {
+        if ctx.is_visible(line_idx) {
+            let w = ctx.lineno_width;
+            let old_line_num = ctx
+                .display_lineno(diff_line.old_lineno, line_idx)
+                .map(|n| format!("{n:>w$}"))
+                .unwrap_or_else(|| " ".repeat(w));
+            let new_line_num = ctx
+                .display_lineno(diff_line.new_lineno, line_idx)
+                .map(|n| format!("{n:>w$}"))
+                .unwrap_or_else(|| " ".repeat(w));
 
-        let indicator = cursor_indicator(line_idx, ctx.current_line_idx);
+            let indicator = cursor_indicator(line_idx, ctx.current_line_idx);
 
-        let mut spans = vec![
-            Span::styled(indicator, styles::current_line_indicator_style(ctx.theme)),
-            Span::styled(format!("{old_line_num} "), styles::dim_style(ctx.theme)),
-            Span::styled(" ".to_string(), styles::diff_context_style(ctx.theme)),
-        ];
+            let mut spans = vec![
+                Span::styled(indicator, styles::current_line_indicator_style(ctx.theme)),
+                Span::styled(format!("{old_line_num} "), styles::dim_style(ctx.theme)),
+                Span::styled(" ".to_string(), styles::diff_context_style(ctx.theme)),
+            ];
 
-        let search = ctx.search_for(line_idx);
-        let content_cell = if let Some(ref highlighted) = diff_line.highlighted_spans {
-            searched_cell_spans(
-                highlighted,
-                ctx.content_width,
+            let search = ctx.search_for(line_idx);
+            let content_cell = if let Some(ref highlighted) = diff_line.highlighted_spans {
+                searched_cell_spans(
+                    highlighted,
+                    ctx.content_width,
+                    styles::diff_context_style(ctx.theme),
+                    search,
+                )
+            } else {
+                plain_cell_spans(
+                    &diff_line.content,
+                    styles::diff_context_style(ctx.theme),
+                    ctx.content_width,
+                    search,
+                )
+            };
+
+            // Left side content - use syntax highlighting if available
+            spans.extend(content_cell.clone());
+
+            // Separator
+            spans.push(Span::styled(" │ ", styles::dim_style(ctx.theme)));
+            spans.push(Span::styled(
+                format!("{new_line_num} "),
+                styles::dim_style(ctx.theme),
+            ));
+            spans.push(Span::styled(
+                " ".to_string(),
                 styles::diff_context_style(ctx.theme),
-                search,
-            )
+            ));
+
+            // Right side content - use same highlighting
+            spans.extend(content_cell);
+
+            lines.push(Line::from(spans));
+
+            let content =
+                content_spans_for_diff_line(ctx.theme, diff_line, LineOrigin::Context, search);
+            let ctx_style = styles::diff_context_style(ctx.theme);
+            let (lp, rp) = sbs_row_prefixes(
+                ctx.theme,
+                indicator,
+                SideSpec {
+                    lineno: ctx.display_lineno(diff_line.old_lineno, line_idx),
+                    marker: " ",
+                    marker_style: ctx_style,
+                },
+                SideSpec {
+                    lineno: ctx.display_lineno(diff_line.new_lineno, line_idx),
+                    marker: " ",
+                    marker_style: ctx_style,
+                },
+                w,
+            );
+            ctx.sbs_meta.borrow_mut().insert(
+                line_idx,
+                SbsRowMeta {
+                    left_content: content.clone(),
+                    right_content: content,
+                    left_prefix: lp,
+                    right_prefix: rp,
+                    left_pad_style: ctx_style,
+                    right_pad_style: ctx_style,
+                },
+            );
         } else {
-            plain_cell_spans(
-                &diff_line.content,
-                styles::diff_context_style(ctx.theme),
-                ctx.content_width,
-                search,
-            )
-        };
-
-        // Left side content - use syntax highlighting if available
-        spans.extend(content_cell.clone());
-
-        // Separator
-        spans.push(Span::styled(" │ ", styles::dim_style(ctx.theme)));
-        spans.push(Span::styled(
-            format!("{new_line_num} "),
-            styles::dim_style(ctx.theme),
-        ));
-        spans.push(Span::styled(
-            " ".to_string(),
-            styles::diff_context_style(ctx.theme),
-        ));
-
-        // Right side content - use same highlighting
-        spans.extend(content_cell);
-
-        lines.push(Line::from(spans));
-
-        let content =
-            content_spans_for_diff_line(ctx.theme, diff_line, LineOrigin::Context, search);
-        let ctx_style = styles::diff_context_style(ctx.theme);
-        let (lp, rp) = sbs_row_prefixes(
-            ctx.theme,
-            indicator,
-            SideSpec {
-                lineno: ctx.display_lineno(diff_line.old_lineno, line_idx),
-                marker: " ",
-                marker_style: ctx_style,
-            },
-            SideSpec {
-                lineno: ctx.display_lineno(diff_line.new_lineno, line_idx),
-                marker: " ",
-                marker_style: ctx_style,
-            },
-            w,
-        );
-        ctx.sbs_meta.borrow_mut().insert(
-            line_idx,
-            SbsRowMeta {
-                left_content: content.clone(),
-                right_content: content,
-                left_prefix: lp,
-                right_prefix: rp,
-                left_pad_style: ctx_style,
-                right_pad_style: ctx_style,
-            },
-        );
-    } else {
-        lines.push(Line::default());
+            lines.push(Line::default());
+        }
+        line_idx += 1;
     }
-    line_idx += 1;
 
     // Add comments if any
     let mut cursor_info_out: Option<SideBySideCursorInfo> = None;
@@ -1567,111 +1575,119 @@ fn render_deletion_addition_pair_side_by_side(
     for offset in 0..max_lines {
         let del_opt = (offset < del_count).then(|| &hunk_lines[start_idx + offset]);
         let add_opt = (offset < add_count).then(|| &hunk_lines[add_start + offset]);
-        if ctx.is_visible(line_idx) {
-            let indicator = cursor_indicator(line_idx, ctx.current_line_idx);
+        if !ctx.app.render_range_fold(
+            file_idx,
+            del_opt.and_then(|l| l.old_lineno),
+            add_opt.and_then(|l| l.new_lineno),
+            lines,
+            &mut line_idx,
+        ) {
+            if ctx.is_visible(line_idx) {
+                let indicator = cursor_indicator(line_idx, ctx.current_line_idx);
 
-            let mut spans = vec![Span::styled(
-                indicator,
-                styles::current_line_indicator_style(ctx.theme),
-            )];
+                let mut spans = vec![Span::styled(
+                    indicator,
+                    styles::current_line_indicator_style(ctx.theme),
+                )];
 
-            // Left side (deletion)
-            if let Some(del_line) = del_opt {
-                add_deletion_spans(
+                // Left side (deletion)
+                if let Some(del_line) = del_opt {
+                    add_deletion_spans(
+                        ctx.theme,
+                        &mut spans,
+                        del_line,
+                        ctx.content_width,
+                        ctx.lineno_width,
+                        ctx.display_lineno(del_line.old_lineno, line_idx),
+                        ctx.search_for(line_idx),
+                    );
+                } else {
+                    add_empty_column_spans(&mut spans, ctx.content_width, ctx.lineno_width);
+                }
+
+                spans.push(Span::styled(" │ ", styles::dim_style(ctx.theme)));
+
+                // Right side (addition)
+                if let Some(add_line) = add_opt {
+                    add_addition_spans(
+                        ctx.theme,
+                        &mut spans,
+                        add_line,
+                        ctx.content_width,
+                        ctx.lineno_width,
+                        ctx.display_lineno(add_line.new_lineno, line_idx),
+                        ctx.search_for(line_idx),
+                    );
+                } else {
+                    add_empty_column_spans(&mut spans, ctx.content_width, ctx.lineno_width);
+                }
+
+                lines.push(Line::from(spans));
+
+                let w = ctx.lineno_width;
+                let (left_content, left_pad, left_marker, left_lineno, left_marker_style) =
+                    match del_opt {
+                        Some(dl) => (
+                            content_spans_for_diff_line(
+                                ctx.theme,
+                                dl,
+                                LineOrigin::Deletion,
+                                ctx.search_for(line_idx),
+                            ),
+                            column_pad_style(ctx.theme, dl, LineOrigin::Deletion),
+                            "▌",
+                            ctx.display_lineno(dl.old_lineno, line_idx),
+                            styles::diff_del_style(ctx.theme),
+                        ),
+                        None => (Vec::new(), Style::default(), " ", None, Style::default()),
+                    };
+                let (right_content, right_pad, right_marker, right_lineno, right_marker_style) =
+                    match add_opt {
+                        Some(al) => (
+                            content_spans_for_diff_line(
+                                ctx.theme,
+                                al,
+                                LineOrigin::Addition,
+                                ctx.search_for(line_idx),
+                            ),
+                            column_pad_style(ctx.theme, al, LineOrigin::Addition),
+                            "▌",
+                            ctx.display_lineno(al.new_lineno, line_idx),
+                            styles::diff_add_style(ctx.theme),
+                        ),
+                        None => (Vec::new(), Style::default(), " ", None, Style::default()),
+                    };
+                let (lp, rp) = sbs_row_prefixes(
                     ctx.theme,
-                    &mut spans,
-                    del_line,
-                    ctx.content_width,
-                    ctx.lineno_width,
-                    ctx.display_lineno(del_line.old_lineno, line_idx),
-                    ctx.search_for(line_idx),
+                    indicator,
+                    SideSpec {
+                        lineno: left_lineno,
+                        marker: left_marker,
+                        marker_style: left_marker_style,
+                    },
+                    SideSpec {
+                        lineno: right_lineno,
+                        marker: right_marker,
+                        marker_style: right_marker_style,
+                    },
+                    w,
+                );
+                ctx.sbs_meta.borrow_mut().insert(
+                    line_idx,
+                    SbsRowMeta {
+                        left_content,
+                        right_content,
+                        left_prefix: lp,
+                        right_prefix: rp,
+                        left_pad_style: left_pad,
+                        right_pad_style: right_pad,
+                    },
                 );
             } else {
-                add_empty_column_spans(&mut spans, ctx.content_width, ctx.lineno_width);
+                lines.push(Line::default());
             }
-
-            spans.push(Span::styled(" │ ", styles::dim_style(ctx.theme)));
-
-            // Right side (addition)
-            if let Some(add_line) = add_opt {
-                add_addition_spans(
-                    ctx.theme,
-                    &mut spans,
-                    add_line,
-                    ctx.content_width,
-                    ctx.lineno_width,
-                    ctx.display_lineno(add_line.new_lineno, line_idx),
-                    ctx.search_for(line_idx),
-                );
-            } else {
-                add_empty_column_spans(&mut spans, ctx.content_width, ctx.lineno_width);
-            }
-
-            lines.push(Line::from(spans));
-
-            let w = ctx.lineno_width;
-            let (left_content, left_pad, left_marker, left_lineno, left_marker_style) =
-                match del_opt {
-                    Some(dl) => (
-                        content_spans_for_diff_line(
-                            ctx.theme,
-                            dl,
-                            LineOrigin::Deletion,
-                            ctx.search_for(line_idx),
-                        ),
-                        column_pad_style(ctx.theme, dl, LineOrigin::Deletion),
-                        "▌",
-                        ctx.display_lineno(dl.old_lineno, line_idx),
-                        styles::diff_del_style(ctx.theme),
-                    ),
-                    None => (Vec::new(), Style::default(), " ", None, Style::default()),
-                };
-            let (right_content, right_pad, right_marker, right_lineno, right_marker_style) =
-                match add_opt {
-                    Some(al) => (
-                        content_spans_for_diff_line(
-                            ctx.theme,
-                            al,
-                            LineOrigin::Addition,
-                            ctx.search_for(line_idx),
-                        ),
-                        column_pad_style(ctx.theme, al, LineOrigin::Addition),
-                        "▌",
-                        ctx.display_lineno(al.new_lineno, line_idx),
-                        styles::diff_add_style(ctx.theme),
-                    ),
-                    None => (Vec::new(), Style::default(), " ", None, Style::default()),
-                };
-            let (lp, rp) = sbs_row_prefixes(
-                ctx.theme,
-                indicator,
-                SideSpec {
-                    lineno: left_lineno,
-                    marker: left_marker,
-                    marker_style: left_marker_style,
-                },
-                SideSpec {
-                    lineno: right_lineno,
-                    marker: right_marker,
-                    marker_style: right_marker_style,
-                },
-                w,
-            );
-            ctx.sbs_meta.borrow_mut().insert(
-                line_idx,
-                SbsRowMeta {
-                    left_content,
-                    right_content,
-                    left_prefix: lp,
-                    right_prefix: rp,
-                    left_pad_style: left_pad,
-                    right_pad_style: right_pad,
-                },
-            );
-        } else {
-            lines.push(Line::default());
+            line_idx += 1;
         }
-        line_idx += 1;
 
         // Add comments for deletion
         if let Some(del_line) = del_opt
@@ -1745,65 +1761,73 @@ fn render_standalone_addition_side_by_side(
     mut line_idx: usize,
     lines: &mut Vec<Line>,
 ) -> (usize, Option<SideBySideCursorInfo>) {
-    if ctx.is_visible(line_idx) {
-        let indicator = cursor_indicator(line_idx, ctx.current_line_idx);
+    if !ctx.app.render_range_fold(
+        file_idx,
+        diff_line.old_lineno,
+        diff_line.new_lineno,
+        lines,
+        &mut line_idx,
+    ) {
+        if ctx.is_visible(line_idx) {
+            let indicator = cursor_indicator(line_idx, ctx.current_line_idx);
 
-        let mut spans = vec![Span::styled(
-            indicator,
-            styles::current_line_indicator_style(ctx.theme),
-        )];
-        add_empty_column_spans(&mut spans, ctx.content_width, ctx.lineno_width);
-        spans.push(Span::styled(" │ ", styles::dim_style(ctx.theme)));
-        add_addition_spans(
-            ctx.theme,
-            &mut spans,
-            diff_line,
-            ctx.content_width,
-            ctx.lineno_width,
-            ctx.display_lineno(diff_line.new_lineno, line_idx),
-            ctx.search_for(line_idx),
-        );
+            let mut spans = vec![Span::styled(
+                indicator,
+                styles::current_line_indicator_style(ctx.theme),
+            )];
+            add_empty_column_spans(&mut spans, ctx.content_width, ctx.lineno_width);
+            spans.push(Span::styled(" │ ", styles::dim_style(ctx.theme)));
+            add_addition_spans(
+                ctx.theme,
+                &mut spans,
+                diff_line,
+                ctx.content_width,
+                ctx.lineno_width,
+                ctx.display_lineno(diff_line.new_lineno, line_idx),
+                ctx.search_for(line_idx),
+            );
 
-        lines.push(Line::from(spans));
+            lines.push(Line::from(spans));
 
-        let w = ctx.lineno_width;
-        let right_content = content_spans_for_diff_line(
-            ctx.theme,
-            diff_line,
-            LineOrigin::Addition,
-            ctx.search_for(line_idx),
-        );
-        let right_pad = column_pad_style(ctx.theme, diff_line, LineOrigin::Addition);
-        let (lp, rp) = sbs_row_prefixes(
-            ctx.theme,
-            indicator,
-            SideSpec {
-                lineno: None,
-                marker: " ",
-                marker_style: Style::default(),
-            },
-            SideSpec {
-                lineno: ctx.display_lineno(diff_line.new_lineno, line_idx),
-                marker: "▌",
-                marker_style: styles::diff_add_style(ctx.theme),
-            },
-            w,
-        );
-        ctx.sbs_meta.borrow_mut().insert(
-            line_idx,
-            SbsRowMeta {
-                left_content: Vec::new(),
-                right_content,
-                left_prefix: lp,
-                right_prefix: rp,
-                left_pad_style: Style::default(),
-                right_pad_style: right_pad,
-            },
-        );
-    } else {
-        lines.push(Line::default());
+            let w = ctx.lineno_width;
+            let right_content = content_spans_for_diff_line(
+                ctx.theme,
+                diff_line,
+                LineOrigin::Addition,
+                ctx.search_for(line_idx),
+            );
+            let right_pad = column_pad_style(ctx.theme, diff_line, LineOrigin::Addition);
+            let (lp, rp) = sbs_row_prefixes(
+                ctx.theme,
+                indicator,
+                SideSpec {
+                    lineno: None,
+                    marker: " ",
+                    marker_style: Style::default(),
+                },
+                SideSpec {
+                    lineno: ctx.display_lineno(diff_line.new_lineno, line_idx),
+                    marker: "▌",
+                    marker_style: styles::diff_add_style(ctx.theme),
+                },
+                w,
+            );
+            ctx.sbs_meta.borrow_mut().insert(
+                line_idx,
+                SbsRowMeta {
+                    left_content: Vec::new(),
+                    right_content,
+                    left_prefix: lp,
+                    right_prefix: rp,
+                    left_pad_style: Style::default(),
+                    right_pad_style: right_pad,
+                },
+            );
+        } else {
+            lines.push(Line::default());
+        }
+        line_idx += 1;
     }
-    line_idx += 1;
 
     // Add comments if any
     let mut cursor_info_out: Option<SideBySideCursorInfo> = None;

@@ -316,7 +316,7 @@ A first-session cheatsheet. Press `?` inside tuicr for the full reference.
 | `i` / `e` (file tree) | Filter files in / out by regex; narrows the tree **and** the diff |
 | `I` / `E` (file tree) | Clear the include / exclude filter |
 | `c` / `C` | Add line / file comment |
-| `v` / `V` | Visual mode (range comment) |
+| `v` / `V` | Visual mode (range comment; `R` reviews and folds selected lines) |
 | `r` | Toggle file reviewed |
 | `R` | Toggle hunk reviewed |
 | `e` | Open focused file in `$EDITOR` (in PR review: the PR's revision, as a read-only copy when the checkout differs) |
